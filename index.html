@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>سكينة — مواقيت الصلاة</title>
+<style>
+  /* Lightweight on purpose: no web fonts, no libraries, one timer per second. */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: "Segoe UI", Tahoma, "LG Smart UI", Arial, sans-serif;
+    color: #f3eefc;
+    background: #0a0d26;
+    background-image:
+      radial-gradient(circle at 76% 22%, rgba(255,240,210,.95) 0, rgba(255,240,210,.95) 3.2vw, rgba(255,226,190,.18) 3.4vw, rgba(255,226,190,0) 13vw),
+      linear-gradient(180deg, #070a24 0%, #1c1850 42%, #4a2a6e 72%, #8a4a76 100%);
+  }
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .ridge { position: fixed; left: 0; right: 0; bottom: 0; height: 30vh; pointer-events: none; }
+  .wrap { position: relative; height: 100%; display: grid; grid-template-rows: auto 1fr auto; padding: 4vh 4.5vw; }
+
+  header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .brand { font-size: 2.4vw; font-weight: 600; letter-spacing: .02em; }
+  .brand small { display: block; font-size: 1vw; opacity: .65; font-weight: 400; margin-top: .3vh; }
+  .city { text-align: left; font-size: 1.25vw; opacity: .8; line-height: 1.6; }
+  .weather { font-size: 1.6vw; opacity: 1; }
+
+  main { display: grid; grid-template-columns: 1fr 1fr; align-items: center; grid-gap: 4vw; }
+  .clock { font-size: 11vw; font-weight: 300; line-height: 1; letter-spacing: -.02em; direction: ltr; text-align: right; }
+  .clock .sec { font-size: 3vw; opacity: .55; margin-left: .6vw; }
+  .dates { margin-top: 2vh; font-size: 1.6vw; opacity: .85; line-height: 1.7; }
+
+  .next {
+    justify-self: start; min-width: 30vw; padding: 3vh 2.5vw; border-radius: 1.6vw;
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14);
+  }
+  .next .lbl { font-size: 1.2vw; opacity: .7; }
+  .next .name { font-size: 4.2vw; font-weight: 600; margin: .6vh 0; }
+  .next .at { font-size: 1.6vw; opacity: .85; }
+  .next .count { font-size: 3.2vw; font-weight: 300; margin-top: 1.5vh; direction: ltr; text-align: right; color: #ffd9a8; }
+
+  footer { }
+  .prayers { display: grid; grid-template-columns: repeat(6, 1fr); grid-gap: 1.2vw; }
+  .p {
+    text-align: center; padding: 2.2vh 0; border-radius: 1.2vw;
+    background: rgba(10,8,35,.45); border: 1px solid rgba(255,255,255,.1);
+  }
+  .p .n { font-size: 1.4vw; opacity: .75; }
+  .p .t { font-size: 2.6vw; font-weight: 600; margin-top: .6vh; direction: ltr; }
+  .p.on { background: rgba(255,217,168,.16); border-color: rgba(255,217,168,.6); }
+  .p.on .n { opacity: 1; color: #ffd9a8; }
+  .p.done { opacity: .5; }
+  .ayah { text-align: center; font-size: 1.3vw; opacity: .6; margin-top: 2.4vh; }
+</style>
+</head>
+<body>
+<svg class="stars" id="stars" preserveAspectRatio="none" viewBox="0 0 1000 1000"></svg>
+<svg class="ridge" viewBox="0 0 1000 100" preserveAspectRatio="none">
+  <path d="M0 55 C120 30 220 60 330 40 S560 20 680 45 S880 30 1000 42 V100 H0Z" fill="#2a1d55" opacity=".75"/>
+  <path d="M0 75 C150 55 260 80 400 62 S640 50 760 70 S920 60 1000 66 V100 H0Z" fill="#150f33"/>
+</svg>
+
+<div class="wrap">
+  <header>
+    <div class="brand">✦ سكينة<small>لكل صلاةٍ موعد</small></div>
+    <div class="city"><div class="weather" id="weather"></div>الرياض · تقويم أم القرى</div>
+  </header>
+
+  <main>
+    <div>
+      <div class="clock" id="clock">--:--</div>
+      <div class="dates"><div id="hijri"></div><div id="greg"></div></div>
+    </div>
+    <div class="next">
+      <div class="lbl">الصلاة القادمة</div>
+      <div class="name" id="nextName">—</div>
+      <div class="at" id="nextAt"></div>
+      <div class="count" id="count"></div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="prayers" id="prayers"></div>
+    <div class="ayah">﴿ إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ كِتَابًا مَّوْقُوتًا ﴾</div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var LAT = 24.7136, LNG = 46.6753, TZ = 3; // Riyadh, UTC+3 (no DST)
+  var NAMES = { fajr: 'الفجر', sunrise: 'الشروق', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء' };
+  var ORDER = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
+  // ---- Stars (drawn once) ----
+  var s = '', seed = 7;
+  function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+  for (var i = 0; i < 160; i++) {
+    var y = Math.pow(rnd(), 1.6) * 650;
+    s += '<circle cx="' + (rnd() * 1000).toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (0.6 + rnd() * 1.3).toFixed(2) +
+         '" fill="#fff" opacity="' + (0.25 + 0.7 * rnd() * (1 - y / 650)).toFixed(2) + '"/>';
+  }
+  document.getElementById('stars').innerHTML = s;
+
+  // ---- Prayer times (PrayTimes.org algorithm, Umm al-Qura parameters) ----
+  var rad = Math.PI / 180;
+  function fix(a, b) { a = a - b * Math.floor(a / b); return a < 0 ? a + b : a; }
+  function julian(y, m, d) {
+    if (m <= 2) { y -= 1; m += 12; }
+    var A = Math.floor(y / 100), B = 2 - A + Math.floor(A / 4);
+    return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
+  }
+  function sun(jd) {
+    var D = jd - 2451545.0;
+    var g = fix(357.529 + 0.98560028 * D, 360), q = fix(280.459 + 0.98564736 * D, 360);
+    var L = fix(q + 1.915 * Math.sin(g * rad) + 0.020 * Math.sin(2 * g * rad), 360);
+    var e = 23.439 - 0.00000036 * D;
+    var RA = Math.atan2(Math.cos(e * rad) * Math.sin(L * rad), Math.cos(L * rad)) / rad / 15;
+    return { decl: Math.asin(Math.sin(e * rad) * Math.sin(L * rad)) / rad, eqt: q / 15 - fix(RA, 24) };
+  }
+  function times(date, ramadan) {
+    var jd = julian(date.getFullYear(), date.getMonth() + 1, date.getDate()) - LNG / 360;
+    function noon(t) { return fix(12 - sun(jd + t / 24).eqt, 24); }
+    function angle(a, t, ccw) {
+      var sp = sun(jd + t / 24), d = sp.decl;
+      var x = Math.acos((-Math.sin(a * rad) - Math.sin(d * rad) * Math.sin(LAT * rad)) /
+                        (Math.cos(d * rad) * Math.cos(LAT * rad))) / rad / 15;
+      return noon(t) + (ccw ? -x : x);
+    }
+    function asrAngle(t) {
+      var d = sun(jd + t / 24).decl;
+      return -Math.atan(1 / (1 + Math.tan(Math.abs(LAT - d) * rad))) / rad;
+    }
+    // two passes for accuracy
+    var t = { fajr: 5, sunrise: 6, dhuhr: 12, asr: 13, maghrib: 18 };
+    for (var k = 0; k < 2; k++) {
+      t = { fajr: angle(18.5, t.fajr, true), sunrise: angle(0.833, t.sunrise, true),
+            dhuhr: noon(t.dhuhr), asr: angle(asrAngle(t.asr), t.asr, false), maghrib: angle(0.833, t.maghrib, false) };
+    }
+    var adj = TZ - LNG / 15, out = {};
+    for (var n in t) out[n] = t[n] + adj;
+    out.isha = out.maghrib + (ramadan ? 120 : 90) / 60;
+    var res = {};
+    ORDER.forEach(function (n) {
+      var mins = Math.ceil(out[n] * 60 - 0.0001);  // round up to the minute, like official tables
+      var d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, mins, 0);
+      res[n] = d;
+    });
+    return res;
+  }
+
+  // ---- Formatting ----
+  var hijriFmt, gregFmt, dayFmt;
+  try { hijriFmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' }); }
+  catch (e) { try { hijriFmt = new Intl.DateTimeFormat('ar-u-ca-islamic', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e2) {} }
+  try { gregFmt = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) {}
+  function isRamadan(d) {
+    try { var p = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { month: 'numeric' }).format(d); return parseInt(p, 10) === 9; }
+    catch (e) { return false; }
+  }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function hm12(d) {
+    var h = d.getHours(), m = d.getMinutes(), ap = h < 12 ? 'ص' : 'م';
+    h = h % 12; if (h === 0) h = 12;
+    return h + ':' + pad(m) + ' ' + ap;
+  }
+
+  // ---- Render ----
+  var elClock = document.getElementById('clock'), elPr = document.getElementById('prayers');
+  var dayKey = '', today, tomorrow, cells = {};
+
+  function buildDay(now) {
+    var tmr = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    today = times(now, isRamadan(now));
+    tomorrow = times(tmr, isRamadan(tmr));
+    elPr.innerHTML = '';
+    ORDER.forEach(function (n) {
+      var c = document.createElement('div');
+      c.className = 'p';
+      c.innerHTML = '<div class="n">' + NAMES[n] + '</div><div class="t">' + hm12(today[n]) + '</div>';
+      elPr.appendChild(c); cells[n] = c;
+    });
+    document.getElementById('hijri').textContent = hijriFmt ? hijriFmt.format(now) : '';
+    document.getElementById('greg').textContent = gregFmt ? gregFmt.format(now) : now.toDateString();
+  }
+
+  function tick() {
+    var now = new Date();
+    var key = now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate();
+    if (key !== dayKey) { dayKey = key; buildDay(now); }
+
+    var h = now.getHours() % 12; if (h === 0) h = 12;
+    elClock.innerHTML = h + ':' + pad(now.getMinutes()) + '<span class="sec">' + pad(now.getSeconds()) + '</span>';
+
+    var next = null, nextName = '', isTomorrow = false;
+    for (var i = 0; i < ORDER.length; i++) {
+      var n = ORDER[i];
+      if (n === 'sunrise') continue;
+      if (today[n] > now) { next = today[n]; nextName = n; break; }
+    }
+    if (!next) { next = tomorrow.fajr; nextName = 'fajr'; isTomorrow = true; }
+
+    ORDER.forEach(function (n) {
+      cells[n].className = 'p' + (n === nextName && !isTomorrow ? ' on' : (today[n] <= now ? ' done' : ''));
+    });
+
+    var diff = Math.max(0, Math.floor((next - now) / 1000));
+    document.getElementById('nextName').textContent = NAMES[nextName] + (isTomorrow ? ' غدًا' : '');
+    document.getElementById('nextAt').textContent = 'الأذان ' + hm12(next);
+    document.getElementById('count').textContent =
+      pad(Math.floor(diff / 3600)) + ':' + pad(Math.floor(diff / 60) % 60) + ':' + pad(diff % 60);
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // ---- Weather (optional; quietly skipped if offline) ----
+  var CODES = { 0: '☀️ صافٍ', 1: '🌤 صافٍ غالبًا', 2: '⛅ غائم جزئيًا', 3: '☁️ غائم', 45: '🌫 ضباب', 48: '🌫 ضباب',
+                51: '🌦 رذاذ', 61: '🌧 مطر', 63: '🌧 مطر', 65: '🌧 مطر غزير', 80: '🌦 زخات', 95: '⛈ رعد' };
+  function weather() {
+    var x = new XMLHttpRequest();
+    x.open('GET', 'https://api.open-meteo.com/v1/forecast?latitude=' + LAT + '&longitude=' + LNG + '&current_weather=true&timezone=Asia%2FRiyadh');
+    x.timeout = 10000;
+    x.onload = function () {
+      try {
+        var w = JSON.parse(x.responseText).current_weather;
+        document.getElementById('weather').textContent = Math.round(w.temperature) + '° ' + (CODES[w.weathercode] || '');
+      } catch (e) {}
+    };
+    x.send();
+  }
+  weather();
+  setInterval(weather, 30 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
