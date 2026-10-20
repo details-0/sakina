@@ -18,10 +18,10 @@
   /* Fallback until a photo loads: a calm desert-dusk gradient, nothing drawn behind the clock */
   #bg0 { opacity: 1; background-image: linear-gradient(165deg, #0c1131 0%, #1d1c4a 42%, #4a3260 72%, #8d5a57 100%); }
   .shade { position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-           background: linear-gradient(180deg, rgba(0,0,0,.5) 0%, rgba(0,0,0,.15) 30%, rgba(0,0,0,.15) 55%, rgba(0,0,0,.7) 100%); }
+           background: linear-gradient(180deg, rgba(0,0,0,.58) 0%, rgba(0,0,0,.32) 30%, rgba(0,0,0,.3) 55%, rgba(0,0,0,.78) 100%); }
 
   .num { direction: ltr; unicode-bidi: isolate; display: inline-block; }
-  .card { background: rgba(8,10,28,.55); border: 1px solid rgba(255,255,255,.14); border-radius: 1.2vw; }
+  .card { background: rgba(8,10,28,.68); border: 1px solid rgba(255,255,255,.14); border-radius: 1.2vw; }
   .muted { opacity: .72; }
   .lbl { font-size: 1.05vw; opacity: .72; }
   .fade { transition: opacity .8s ease; }
@@ -34,9 +34,9 @@
   /* Row 1, right: clock and dates */
   #clockBox { grid-column: 1; grid-row: 1; align-self: start; }
   .brand { font-size: 1.15vw; font-weight: 600; opacity: .85; margin-bottom: .6vh; }
-  #clock { font-size: 9vw; font-weight: 300; line-height: 1; text-shadow: 0 .3vw 2vw rgba(0,0,0,.35); }
+  #clock { font-size: 9vw; font-weight: 300; line-height: 1; text-shadow: 0 .2vw 1.4vw rgba(0,0,0,.6); }
   #clock .sec { font-size: 2.4vw; opacity: .6; margin-left: .5vw; }
-  .dates { margin-top: 1.2vh; font-size: 1.5vw; line-height: 1.6; text-shadow: 0 .1vw .8vw rgba(0,0,0,.5); }
+  .dates { margin-top: 1.2vh; font-size: 1.5vw; line-height: 1.6; text-shadow: 0 .1vw .8vw rgba(0,0,0,.75); }
 
   /* Row 1, left: weather */
   #wx { grid-column: 2; grid-row: 1; align-self: start; }
@@ -353,6 +353,7 @@
     }
     $('wxDays').innerHTML = html;
   }
+  var weatherRetry = null;
   function weather() {
     if (!$('wxCity').textContent) $('wxCity').textContent = CFG.city;   // keep the corner filled even before data arrives
     renderWeather(load('wx', 3 * HOUR));
@@ -363,7 +364,10 @@
         for (var i = 0; i < j.daily.time.length; i++)
           w.days.push({ date: j.daily.time[i], code: j.daily.weathercode[i], max: Math.round(j.daily.temperature_2m_max[i]), min: Math.round(j.daily.temperature_2m_min[i]) });
         store('wx', w); renderWeather(w);
-      }).catch(function (e) { dbg('weather not shown: ' + (e && e.message)); });
+      }).catch(function (e) {
+        dbg('weather not shown: ' + (e && e.message) + ' (retry in 3 min)');
+        if (!weatherRetry) weatherRetry = setTimeout(function () { weatherRetry = null; weather(); }, 3 * 6e4);
+      });
   }
 
   // ---------- Verse of the day (text from api.alquran.cloud) and hadith of the day (an-Nawawi's Forty) ----------
