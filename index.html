@@ -3,107 +3,154 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>سكينة — مواقيت الصلاة</title>
+<title>سكينة — شاشة البيت</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;600&family=Amiri&display=swap" rel="stylesheet">
 <style>
-  /* Lightweight on purpose: no web fonts, no libraries, one timer per second. */
+  /* Written for the LG webOS 5 browser (Chromium 68): no flex gap, no inset, no backdrop-filter, no ?. or ??. */
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; overflow: hidden; }
-  body {
-    font-family: "Segoe UI", Tahoma, "LG Smart UI", Arial, sans-serif;
-    color: #f3eefc;
-    background: #0a0d26;
-    background-image:
-      radial-gradient(circle at 76% 22%, rgba(255,240,210,.95) 0, rgba(255,240,210,.95) 3.2vw, rgba(255,226,190,.18) 3.4vw, rgba(255,226,190,0) 13vw),
-      linear-gradient(180deg, #070a24 0%, #1c1850 42%, #4a2a6e 72%, #8a4a76 100%);
-  }
-  .stars { position: fixed; inset: 0; pointer-events: none; }
-  .ridge { position: fixed; left: 0; right: 0; bottom: 0; height: 30vh; pointer-events: none; }
-  .wrap { position: relative; height: 100%; display: grid; grid-template-rows: auto 1fr auto; padding: 4vh 4.5vw; }
+  html, body { height: 100%; overflow: hidden; background: #0a0d26; }
+  body { font-family: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, Arial, sans-serif; color: #fff; }
 
-  header { display: flex; justify-content: space-between; align-items: flex-start; }
-  .brand { font-size: 2.4vw; font-weight: 600; letter-spacing: .02em; }
-  .brand small { display: block; font-size: 1vw; opacity: .65; font-weight: 400; margin-top: .3vh; }
-  .city { text-align: left; font-size: 1.25vw; opacity: .8; line-height: 1.6; }
-  .weather { font-size: 1.6vw; opacity: 1; }
+  .bg { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-size: cover; background-position: center;
+        opacity: 0; transition: opacity 2.5s ease; }
+  .bg.on { opacity: 1; }
+  #bg0 { opacity: 1; background-image: radial-gradient(circle at 76% 22%, rgba(255,240,210,.9) 0, rgba(255,240,210,.9) 3vw, rgba(255,226,190,.15) 3.2vw, rgba(255,226,190,0) 12vw), linear-gradient(180deg, #070a24 0%, #1c1850 45%, #4a2a6e 75%, #8a4a76 100%); }
+  .shade { position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+           background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.12) 28%, rgba(0,0,0,.1) 52%, rgba(0,0,0,.72) 100%); }
 
-  main { display: grid; grid-template-columns: 1fr 1fr; align-items: center; grid-gap: 4vw; }
-  .clock { font-size: 11vw; font-weight: 300; line-height: 1; letter-spacing: -.02em; direction: ltr; text-align: right; }
-  .clock .sec { font-size: 3vw; opacity: .55; margin-left: .6vw; }
-  .dates { margin-top: 2vh; font-size: 1.6vw; opacity: .85; line-height: 1.7; }
+  .num { direction: ltr; unicode-bidi: isolate; display: inline-block; }
+  .card { background: rgba(8,10,28,.52); border: 1px solid rgba(255,255,255,.14); border-radius: 1.3vw; }
+  .muted { opacity: .72; }
+  .fade { transition: opacity .8s ease; }
 
-  .next {
-    justify-self: start; min-width: 30vw; padding: 3vh 2.5vw; border-radius: 1.6vw;
-    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14);
-  }
-  .next .lbl { font-size: 1.2vw; opacity: .7; }
-  .next .name { font-size: 4.2vw; font-weight: 600; margin: .6vh 0; }
-  .next .at { font-size: 1.6vw; opacity: .85; }
-  .next .count { font-size: 3.2vw; font-weight: 300; margin-top: 1.5vh; direction: ltr; text-align: right; color: #ffd9a8; }
+  /* Clock block (top right) */
+  #clockBox { position: fixed; top: 5vh; right: 4.5vw; text-align: right; }
+  .brand { font-size: 1.15vw; font-weight: 600; opacity: .85; margin-bottom: 1vh; }
+  #clock { font-size: 9.5vw; font-weight: 300; line-height: 1; text-shadow: 0 .3vw 2vw rgba(0,0,0,.35); }
+  #clock .sec { font-size: 2.6vw; opacity: .6; margin-left: .5vw; }
+  .dates { margin-top: 1.6vh; font-size: 1.5vw; line-height: 1.6; text-shadow: 0 .1vw .8vw rgba(0,0,0,.5); }
 
-  footer { }
-  .prayers { display: grid; grid-template-columns: repeat(6, 1fr); grid-gap: 1.2vw; }
-  .p {
-    text-align: center; padding: 2.2vh 0; border-radius: 1.2vw;
-    background: rgba(10,8,35,.45); border: 1px solid rgba(255,255,255,.1);
-  }
-  .p .n { font-size: 1.4vw; opacity: .75; }
-  .p .t { font-size: 2.6vw; font-weight: 600; margin-top: .6vh; direction: ltr; }
-  .p.on { background: rgba(255,217,168,.16); border-color: rgba(255,217,168,.6); }
-  .p.on .n { opacity: 1; color: #ffd9a8; }
-  .p.done { opacity: .5; }
-  .ayah { text-align: center; font-size: 1.3vw; opacity: .6; margin-top: 2.4vh; }
+  /* Weather (top left) */
+  #wx { position: fixed; top: 4vh; left: 4.5vw; text-align: left; direction: rtl; }
+  #wxNow { display: flex; align-items: center; justify-content: flex-end; font-size: 2.8vw; font-weight: 300; }
+  #wxNow svg { width: 3.2vw; height: 3.2vw; margin-left: .8vw; }
+  #wxCity { font-size: 1.1vw; text-align: left; margin-top: .4vh; }
+  #wxDays { display: flex; margin-top: 1.6vh; }
+  .day { width: 5.2vw; text-align: center; padding: 1vh 0; margin-right: .6vw; font-size: 1vw; }
+  .day svg { width: 1.9vw; height: 1.9vw; display: block; margin: .5vh auto; }
+  .day .hi { font-weight: 600; font-size: 1.15vw; }
+
+  /* Left column cards */
+  #side { position: fixed; left: 4.5vw; top: 29vh; width: 27vw; }
+  #nextCard { padding: 2vh 2vw; }
+  .lbl { font-size: 1.05vw; opacity: .72; }
+  #nextName { font-size: 2.9vw; font-weight: 600; margin: .2vh 0; }
+  #nextAt { font-size: 1.25vw; opacity: .85; }
+  #count { font-size: 2.4vw; font-weight: 300; margin-top: .6vh; color: #ffdcae; }
+  #iqama { font-size: 1.05vw; margin-top: .4vh; color: #ffdcae; }
+  #iqama:empty { display: none; }
+  #matchCard { margin-top: 1.6vh; padding: 1.6vh 2vw; display: none; }
+  .teams { font-size: 1.5vw; font-weight: 600; margin: .4vh 0 .2vh; }
+  .teams .vs { opacity: .6; font-weight: 400; margin: 0 .6vw; }
+  #matchWhen { font-size: 1.1vw; opacity: .85; }
+  #matchLast { font-size: 1vw; opacity: .7; margin-top: .5vh; }
+  #matchLast:empty { display: none; }
+
+  /* Verse / hadith (right, middle) */
+  #wisdom { position: fixed; right: 4.5vw; top: 46vh; width: 50vw; padding: 2.8vh 2.4vw; }
+  #wText { font-family: "Amiri", "Noto Naskh Arabic", serif; font-size: 2vw; line-height: 1.75; margin-top: .8vh; }
+  #wText.small { font-size: 1.6vw; }
+  #wSrc { font-size: 1.05vw; opacity: .7; margin-top: 1.2vh; }
+
+  /* Prayer row (bottom) */
+  #prayers { position: fixed; left: 4.5vw; right: 4.5vw; bottom: 6vh; display: grid; grid-template-columns: repeat(6, 1fr); grid-gap: 1vw; }
+  .p { text-align: center; padding: 1.8vh 0; }
+  .p .n { font-size: 1.25vw; opacity: .78; }
+  .p .t { font-size: 2.3vw; font-weight: 600; margin-top: .4vh; }
+  .p.on { background: rgba(255,220,174,.2); border-color: rgba(255,220,174,.7); }
+  .p.on .n { opacity: 1; color: #ffdcae; }
+  .p.done { opacity: .55; }
+  #credit { position: fixed; left: 4.5vw; bottom: 1.8vh; font-size: .85vw; opacity: .55; direction: ltr; }
+  #ayahLine { position: fixed; right: 4.5vw; bottom: 1.8vh; font-size: .95vw; opacity: .6; }
 </style>
 </head>
 <body>
-<svg class="stars" id="stars" preserveAspectRatio="none" viewBox="0 0 1000 1000"></svg>
-<svg class="ridge" viewBox="0 0 1000 100" preserveAspectRatio="none">
-  <path d="M0 55 C120 30 220 60 330 40 S560 20 680 45 S880 30 1000 42 V100 H0Z" fill="#2a1d55" opacity=".75"/>
-  <path d="M0 75 C150 55 260 80 400 62 S640 50 760 70 S920 60 1000 66 V100 H0Z" fill="#150f33"/>
-</svg>
+<div class="bg" id="bg0"></div>
+<div class="bg" id="bgA"></div>
+<div class="bg" id="bgB"></div>
+<div class="shade"></div>
 
-<div class="wrap">
-  <header>
-    <div class="brand">✦ سكينة<small>لكل صلاةٍ موعد</small></div>
-    <div class="city"><div class="weather" id="weather"></div>الرياض · تقويم أم القرى</div>
-  </header>
-
-  <main>
-    <div>
-      <div class="clock" id="clock">--:--</div>
-      <div class="dates"><div id="hijri"></div><div id="greg"></div></div>
-    </div>
-    <div class="next">
-      <div class="lbl">الصلاة القادمة</div>
-      <div class="name" id="nextName">—</div>
-      <div class="at" id="nextAt"></div>
-      <div class="count" id="count"></div>
-    </div>
-  </main>
-
-  <footer>
-    <div class="prayers" id="prayers"></div>
-    <div class="ayah">﴿ إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ كِتَابًا مَّوْقُوتًا ﴾</div>
-  </footer>
+<div id="clockBox">
+  <div class="brand">✦ سكينة</div>
+  <div id="clock">--:--</div>
+  <div class="dates"><div id="hijri"></div><div id="greg" class="muted"></div></div>
 </div>
+
+<div id="wx">
+  <div id="wxNow"></div>
+  <div id="wxCity" class="muted"></div>
+  <div id="wxDays"></div>
+</div>
+
+<div id="side">
+  <div id="nextCard" class="card">
+    <div class="lbl">الصلاة القادمة</div>
+    <div id="nextName">—</div>
+    <div id="nextAt"></div>
+    <div id="count" class="num"></div>
+    <div id="iqama"></div>
+  </div>
+  <div id="matchCard" class="card">
+    <div class="lbl" id="matchLbl">المباراة القادمة</div>
+    <div class="teams" id="matchTeams"></div>
+    <div id="matchWhen"></div>
+    <div id="matchLast"></div>
+  </div>
+</div>
+
+<div id="wisdom" class="card fade" style="opacity:0">
+  <div class="lbl" id="wLbl"></div>
+  <div id="wText"></div>
+  <div id="wSrc"></div>
+</div>
+
+<div id="prayers"></div>
+<div id="credit"></div>
+<div id="ayahLine">﴿ إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ كِتَابًا مَّوْقُوتًا ﴾</div>
 
 <script>
 (function () {
   'use strict';
-  var LAT = 24.7136, LNG = 46.6753, TZ = 3; // Riyadh, UTC+3 (no DST)
+
+  // ---------- Settings (override with #city=..&lat=..&lon=..&teams=id,id) ----------
+  var CFG = { city: 'الرياض', lat: 24.7136, lon: 46.6753, tz: 3, teams: ['136137'] };
+  (location.hash || '').replace(/^#/, '').split('&').forEach(function (kv) {
+    var p = kv.split('='); if (!p[0] || p[1] === undefined) return;
+    var v = decodeURIComponent(p[1]);
+    if (p[0] === 'city') CFG.city = v;
+    if (p[0] === 'lat') CFG.lat = parseFloat(v);
+    if (p[0] === 'lon') CFG.lon = parseFloat(v);
+    if (p[0] === 'teams') CFG.teams = v.split(',').filter(Boolean);
+  });
+
+  var $ = function (id) { return document.getElementById(id); };
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function store(k, v) { try { localStorage.setItem('sk_' + k, JSON.stringify({ t: Date.now(), v: v })); } catch (e) {} }
+  function load(k, maxAgeMs) {
+    try { var o = JSON.parse(localStorage.getItem('sk_' + k)); if (o && (!maxAgeMs || Date.now() - o.t < maxAgeMs)) return o.v; } catch (e) {}
+    return null;
+  }
+  function getJSON(url) {
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+  }
+  function dayIndex(d) { return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5); }
+  var HOUR = 36e5;
+
+  // ---------- Prayer times (PrayTimes.org algorithm, Umm al-Qura) ----------
   var NAMES = { fajr: 'الفجر', sunrise: 'الشروق', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء' };
   var ORDER = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
-
-  // ---- Stars (drawn once) ----
-  var s = '', seed = 7;
-  function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
-  for (var i = 0; i < 160; i++) {
-    var y = Math.pow(rnd(), 1.6) * 650;
-    s += '<circle cx="' + (rnd() * 1000).toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (0.6 + rnd() * 1.3).toFixed(2) +
-         '" fill="#fff" opacity="' + (0.25 + 0.7 * rnd() * (1 - y / 650)).toFixed(2) + '"/>';
-  }
-  document.getElementById('stars').innerHTML = s;
-
-  // ---- Prayer times (PrayTimes.org algorithm, Umm al-Qura parameters) ----
+  var IQAMA = { fajr: 25, dhuhr: 20, asr: 20, maghrib: 10, isha: 20 };
   var rad = Math.PI / 180;
   function fix(a, b) { a = a - b * Math.floor(a / b); return a < 0 ? a + b : a; }
   function julian(y, m, d) {
@@ -112,125 +159,259 @@
     return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
   }
   function sun(jd) {
-    var D = jd - 2451545.0;
-    var g = fix(357.529 + 0.98560028 * D, 360), q = fix(280.459 + 0.98564736 * D, 360);
-    var L = fix(q + 1.915 * Math.sin(g * rad) + 0.020 * Math.sin(2 * g * rad), 360);
-    var e = 23.439 - 0.00000036 * D;
+    var D = jd - 2451545.0, g = fix(357.529 + 0.98560028 * D, 360), q = fix(280.459 + 0.98564736 * D, 360);
+    var L = fix(q + 1.915 * Math.sin(g * rad) + 0.020 * Math.sin(2 * g * rad), 360), e = 23.439 - 0.00000036 * D;
     var RA = Math.atan2(Math.cos(e * rad) * Math.sin(L * rad), Math.cos(L * rad)) / rad / 15;
     return { decl: Math.asin(Math.sin(e * rad) * Math.sin(L * rad)) / rad, eqt: q / 15 - fix(RA, 24) };
   }
-  function times(date, ramadan) {
+  function prayerTimes(date, ramadan) {
+    var LAT = CFG.lat, LNG = CFG.lon;
     var jd = julian(date.getFullYear(), date.getMonth() + 1, date.getDate()) - LNG / 360;
     function noon(t) { return fix(12 - sun(jd + t / 24).eqt, 24); }
     function angle(a, t, ccw) {
-      var sp = sun(jd + t / 24), d = sp.decl;
-      var x = Math.acos((-Math.sin(a * rad) - Math.sin(d * rad) * Math.sin(LAT * rad)) /
-                        (Math.cos(d * rad) * Math.cos(LAT * rad))) / rad / 15;
+      var d = sun(jd + t / 24).decl;
+      var x = Math.acos((-Math.sin(a * rad) - Math.sin(d * rad) * Math.sin(LAT * rad)) / (Math.cos(d * rad) * Math.cos(LAT * rad))) / rad / 15;
       return noon(t) + (ccw ? -x : x);
     }
-    function asrAngle(t) {
-      var d = sun(jd + t / 24).decl;
-      return -Math.atan(1 / (1 + Math.tan(Math.abs(LAT - d) * rad))) / rad;
-    }
-    // two passes for accuracy
+    function asrAngle(t) { var d = sun(jd + t / 24).decl; return -Math.atan(1 / (1 + Math.tan(Math.abs(LAT - d) * rad))) / rad; }
     var t = { fajr: 5, sunrise: 6, dhuhr: 12, asr: 13, maghrib: 18 };
     for (var k = 0; k < 2; k++) {
-      t = { fajr: angle(18.5, t.fajr, true), sunrise: angle(0.833, t.sunrise, true),
-            dhuhr: noon(t.dhuhr), asr: angle(asrAngle(t.asr), t.asr, false), maghrib: angle(0.833, t.maghrib, false) };
+      t = { fajr: angle(18.5, t.fajr, true), sunrise: angle(0.833, t.sunrise, true), dhuhr: noon(t.dhuhr),
+            asr: angle(asrAngle(t.asr), t.asr, false), maghrib: angle(0.833, t.maghrib, false) };
     }
-    var adj = TZ - LNG / 15, out = {};
+    var adj = CFG.tz - LNG / 15, out = {}, res = {};
     for (var n in t) out[n] = t[n] + adj;
     out.isha = out.maghrib + (ramadan ? 120 : 90) / 60;
-    var res = {};
     ORDER.forEach(function (n) {
-      var mins = Math.ceil(out[n] * 60 - 0.0001);  // round up to the minute, like official tables
-      var d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, mins, 0);
-      res[n] = d;
+      res[n] = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, Math.ceil(out[n] * 60 - 0.0001), 0);
     });
     return res;
   }
 
-  // ---- Formatting ----
-  var hijriFmt, gregFmt, dayFmt;
-  try { hijriFmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' }); }
-  catch (e) { try { hijriFmt = new Intl.DateTimeFormat('ar-u-ca-islamic', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e2) {} }
+  // ---------- Dates ----------
+  var hijriFmt = null, gregFmt = null, dayFmt = null;
+  try { hijriFmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) {}
   try { gregFmt = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) {}
+  var DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
   function isRamadan(d) {
-    try { var p = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { month: 'numeric' }).format(d); return parseInt(p, 10) === 9; }
-    catch (e) { return false; }
+    try { return parseInt(new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { month: 'numeric' }).format(d), 10) === 9; } catch (e) { return false; }
   }
-  function pad(n) { return (n < 10 ? '0' : '') + n; }
   function hm12(d) {
-    var h = d.getHours(), m = d.getMinutes(), ap = h < 12 ? 'ص' : 'م';
-    h = h % 12; if (h === 0) h = 12;
-    return h + ':' + pad(m) + ' ' + ap;
+    var h = d.getHours(), ap = h < 12 ? 'ص' : 'م'; h = h % 12; if (h === 0) h = 12;
+    return '<span class="num">' + h + ':' + pad(d.getMinutes()) + '</span> ' + ap;
   }
 
-  // ---- Render ----
-  var elClock = document.getElementById('clock'), elPr = document.getElementById('prayers');
+  // ---------- Clock and prayers ----------
   var dayKey = '', today, tomorrow, cells = {};
-
   function buildDay(now) {
     var tmr = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    today = times(now, isRamadan(now));
-    tomorrow = times(tmr, isRamadan(tmr));
-    elPr.innerHTML = '';
+    today = prayerTimes(now, isRamadan(now)); tomorrow = prayerTimes(tmr, isRamadan(tmr));
+    var row = $('prayers'); row.innerHTML = '';
     ORDER.forEach(function (n) {
-      var c = document.createElement('div');
-      c.className = 'p';
-      c.innerHTML = '<div class="n">' + NAMES[n] + '</div><div class="t">' + hm12(today[n]) + '</div>';
-      elPr.appendChild(c); cells[n] = c;
+      var c = document.createElement('div'); c.className = 'p card';
+      var label = (n === 'maghrib' && isRamadan(now)) ? 'المغرب · الإفطار' : NAMES[n];
+      c.innerHTML = '<div class="n">' + label + '</div><div class="t">' + hm12(today[n]) + '</div>';
+      row.appendChild(c); cells[n] = c;
     });
-    document.getElementById('hijri').textContent = hijriFmt ? hijriFmt.format(now) : '';
-    document.getElementById('greg').textContent = gregFmt ? gregFmt.format(now) : now.toDateString();
+    $('hijri').textContent = hijriFmt ? hijriFmt.format(now) : '';
+    $('greg').textContent = gregFmt ? gregFmt.format(now) : now.toDateString();
   }
-
   function tick() {
-    var now = new Date();
-    var key = now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate();
+    var now = new Date(), key = now.toDateString();
     if (key !== dayKey) { dayKey = key; buildDay(now); }
-
     var h = now.getHours() % 12; if (h === 0) h = 12;
-    elClock.innerHTML = h + ':' + pad(now.getMinutes()) + '<span class="sec">' + pad(now.getSeconds()) + '</span>';
+    $('clock').innerHTML = '<span class="num">' + h + ':' + pad(now.getMinutes()) + '<span class="sec">' + pad(now.getSeconds()) + '</span></span>';
 
-    var next = null, nextName = '', isTomorrow = false;
-    for (var i = 0; i < ORDER.length; i++) {
-      var n = ORDER[i];
-      if (n === 'sunrise') continue;
-      if (today[n] > now) { next = today[n]; nextName = n; break; }
+    var next = null, nextName = '', isTmr = false, i, n;
+    for (i = 0; i < ORDER.length; i++) { n = ORDER[i]; if (n !== 'sunrise' && today[n] > now) { next = today[n]; nextName = n; break; } }
+    if (!next) { next = tomorrow.fajr; nextName = 'fajr'; isTmr = true; }
+
+    // Iqama countdown: within the window after the most recent adhan
+    var iq = '';
+    for (i = ORDER.length - 1; i >= 0; i--) {
+      n = ORDER[i]; if (n === 'sunrise' || today[n] > now) continue;
+      var iqAt = new Date(today[n].getTime() + IQAMA[n] * 6e4);
+      if (iqAt > now) { var s = Math.floor((iqAt - now) / 1000); iq = 'إقامة ' + NAMES[n] + ' بعد <span class="num">' + pad(Math.floor(s / 60)) + ':' + pad(s % 60) + '</span>'; }
+      break;
     }
-    if (!next) { next = tomorrow.fajr; nextName = 'fajr'; isTomorrow = true; }
+    $('iqama').innerHTML = iq;
 
-    ORDER.forEach(function (n) {
-      cells[n].className = 'p' + (n === nextName && !isTomorrow ? ' on' : (today[n] <= now ? ' done' : ''));
+    ORDER.forEach(function (k) {
+      cells[k].className = 'p card' + (k === nextName && !isTmr ? ' on' : (today[k] <= now ? ' done' : ''));
     });
-
     var diff = Math.max(0, Math.floor((next - now) / 1000));
-    document.getElementById('nextName').textContent = NAMES[nextName] + (isTomorrow ? ' غدًا' : '');
-    document.getElementById('nextAt').textContent = 'الأذان ' + hm12(next);
-    document.getElementById('count').textContent =
-      pad(Math.floor(diff / 3600)) + ':' + pad(Math.floor(diff / 60) % 60) + ':' + pad(diff % 60);
-  }
-  tick();
-  setInterval(tick, 1000);
+    $('nextName').textContent = NAMES[nextName] + (isTmr ? ' غدًا' : '');
+    $('nextAt').innerHTML = 'الأذان ' + hm12(next);
+    $('count').textContent = pad(Math.floor(diff / 3600)) + ':' + pad(Math.floor(diff / 60) % 60) + ':' + pad(diff % 60);
 
-  // ---- Weather (optional; quietly skipped if offline) ----
-  var CODES = { 0: '☀️ صافٍ', 1: '🌤 صافٍ غالبًا', 2: '⛅ غائم جزئيًا', 3: '☁️ غائم', 45: '🌫 ضباب', 48: '🌫 ضباب',
-                51: '🌦 رذاذ', 61: '🌧 مطر', 63: '🌧 مطر', 65: '🌧 مطر غزير', 80: '🌦 زخات', 95: '⛈ رعد' };
-  function weather() {
-    var x = new XMLHttpRequest();
-    x.open('GET', 'https://api.open-meteo.com/v1/forecast?latitude=' + LAT + '&longitude=' + LNG + '&current_weather=true&timezone=Asia%2FRiyadh');
-    x.timeout = 10000;
-    x.onload = function () {
-      try {
-        var w = JSON.parse(x.responseText).current_weather;
-        document.getElementById('weather').textContent = Math.round(w.temperature) + '° ' + (CODES[w.weathercode] || '');
-      } catch (e) {}
-    };
-    x.send();
+    // Daily reload at 3:30 AM: picks up page updates and frees any memory the browser held on to.
+    if (now.getHours() === 3 && now.getMinutes() === 30 && now.getSeconds() === 0) location.reload();
   }
-  weather();
-  setInterval(weather, 30 * 60 * 1000);
+
+  // ---------- Background photos (Unsplash, hotlinked; rotate every 30 min) ----------
+  var PHOTOS = [["photo-1682685797365-41f45b562c0a","NEOM"],["photo-1682687220566-5599dbbebf11","NEOM"],["photo-1682687218608-5e2522b04673","NEOM"],["photo-1682685796063-d2604827f7b3","NEOM"],["photo-1682687220208-22d7a2543e88","NEOM"],["photo-1682687220499-d9c06b872eee","NEOM"],["photo-1682687221175-fd40bbafe6ca","NEOM"],["photo-1682685797736-dabb341dc7de","NEOM"],["photo-1506795213373-430e921fe2ed","Hala AlGhanim"],["photo-1682687981974-c5ef2111640c","NEOM"],["photo-1682687218147-9806132dc697","NEOM"],["photo-1682686581362-796145f0e123","NEOM"],["photo-1682686581427-7c80ab60e3f3","NEOM"],["photo-1682685796766-0fddd3e480de","NEOM"],["photo-1682686580186-b55d2a91053c","NEOM"],["photo-1682687220067-dced9a881b56","NEOM"],["photo-1682687221073-53ad74c2cad7","NEOM"],["photo-1707343843598-39755549ac9a","NEOM"]];
+  var front = 'bgA';
+  function photoUrl(p) { return 'https://images.unsplash.com/' + p[0] + '?ixlib=rb-4.1.0&w=1920&h=1080&fit=crop&q=72&fm=jpg'; }
+  function showPhoto() {
+    var slot = Math.floor(Date.now() / (30 * 6e4));
+    var p = PHOTOS[slot % PHOTOS.length], url = photoUrl(p), img = new Image();
+    img.onload = function () {
+      var back = front === 'bgA' ? 'bgB' : 'bgA';
+      $(back).style.backgroundImage = 'url("' + url + '")';
+      $(back).className = 'bg on'; $(front).className = 'bg';
+      setTimeout(function () { $(front).style.backgroundImage = ''; front = back; }, 3000); // release the old image
+      $('credit').textContent = 'Photo: ' + p[1] + ' · Unsplash';
+    };
+    img.src = url;
+  }
+
+  // ---------- Weather (Open-Meteo, every 30 min) ----------
+  function icon(code) {
+    var sunI = '<circle cx="12" cy="12" r="4.5" fill="#ffd36b"/><g stroke="#ffd36b" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M5.3 18.7l1.7-1.7M17 7l1.7-1.7"/></g>';
+    var cloud = '<path d="M7 18.5h10a4 4 0 0 0 .4-8A5.5 5.5 0 0 0 6.9 9.6 4.5 4.5 0 0 0 7 18.5z" fill="#e8ecf5"/>';
+    var g;
+    if (code === 0) g = sunI;
+    else if (code <= 2) g = '<g transform="translate(-3,-3) scale(.75)">' + sunI + '</g>' + cloud;
+    else if (code === 3) g = cloud;
+    else if (code === 45 || code === 48) g = '<g stroke="#e8ecf5" stroke-width="2" stroke-linecap="round"><path d="M4 9h16M3 13h18M5 17h14"/></g>';
+    else if (code >= 95) g = cloud + '<path d="M12.5 14l-2.5 4h3l-2 4" stroke="#ffd36b" stroke-width="1.8" fill="none"/>';
+    else g = cloud + '<g stroke="#8cc8ff" stroke-width="1.8" stroke-linecap="round"><path d="M9 20.5l-1 2M13 20.5l-1 2M17 20.5l-1 2"/></g>';
+    return '<svg viewBox="0 0 24 24">' + g + '</svg>';
+  }
+  var WX = { 0: 'صافٍ', 1: 'صافٍ غالبًا', 2: 'غائم جزئيًا', 3: 'غائم', 45: 'ضباب', 48: 'ضباب', 51: 'رذاذ', 53: 'رذاذ', 55: 'رذاذ',
+             61: 'مطر خفيف', 63: 'مطر', 65: 'مطر غزير', 80: 'زخات', 81: 'زخات', 82: 'زخات قوية', 95: 'عواصف رعدية' };
+  function renderWeather(w) {
+    if (!w) return;
+    $('wxNow').innerHTML = '<span>' + (WX[w.code] || '') + ' <span class="num">' + w.temp + '°</span></span>' + icon(w.code);
+    $('wxCity').textContent = CFG.city;
+    var html = '';
+    for (var i = 1; i < w.days.length && i <= 5; i++) {
+      var d = w.days[i];
+      html += '<div class="day card"><div class="muted">' + DAYS[new Date(d.date + 'T12:00:00').getDay()] + '</div>' + icon(d.code) +
+              '<div class="hi num">' + d.max + '°</div><div class="muted num">' + d.min + '°</div></div>';
+    }
+    $('wxDays').innerHTML = html;
+  }
+  function weather() {
+    renderWeather(load('wx', 3 * HOUR));
+    getJSON('https://api.open-meteo.com/v1/forecast?latitude=' + CFG.lat + '&longitude=' + CFG.lon +
+            '&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min&forecast_days=6&timezone=auto')
+      .then(function (j) {
+        var w = { temp: Math.round(j.current_weather.temperature), code: j.current_weather.weathercode, days: [] };
+        for (var i = 0; i < j.daily.time.length; i++)
+          w.days.push({ date: j.daily.time[i], code: j.daily.weathercode[i], max: Math.round(j.daily.temperature_2m_max[i]), min: Math.round(j.daily.temperature_2m_min[i]) });
+        store('wx', w); renderWeather(w);
+      }).catch(function () {});
+  }
+
+  // ---------- Verse of the day (text from api.alquran.cloud) and hadith of the day (an-Nawawi's Forty) ----------
+  var VERSES = ['13:28', '94:5', '2:152', '2:186', '3:139', '2:153', '40:60', '29:69', '12:87', '20:114', '33:41', '9:51',
+                '2:201', '25:74', '14:7', '93:5', '3:173', '11:115', '16:128', '3:200', '20:25', '65:3', '39:53', '2:45', '7:56', '21:87'];
+  var wisdom = { verse: null, hadith: null }, showing = 'hadith';
+  function loadVerse() {
+    var now = new Date(), key = 'verse_' + now.toDateString(), cached = load(key);
+    if (cached) { wisdom.verse = cached; return; }
+    var ref = VERSES[dayIndex(now) % VERSES.length];
+    getJSON('https://api.alquran.cloud/v1/ayah/' + ref + '/quran-uthmani').then(function (j) {
+      wisdom.verse = { text: j.data.text, src: j.data.surah.name + ' · الآية ' + j.data.numberInSurah };
+      store(key, wisdom.verse);
+    }).catch(function () {});
+  }
+  // Split the trailing source, e.g. "... [رواه البخاري] ، [ومسلم]". Only hadiths whose source is a clean
+  // "رواه البخاري / مسلم" line are kept, so nothing odd ever reaches the screen.
+  function parseHadith(h) {
+    var txt = h.text.replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
+    var m = txt.match(/((?:\s*[،,.]?\s*\[[^\]]+\])+)\s*[.،]?\s*$/);
+    if (!m) return null;
+    var src = m[1].match(/\[[^\]]+\]/g).map(function (s) { return s.slice(1, -1).trim(); }).join(' ');
+    if (src.indexOf('رَوَاهُ') !== 0 || /[0-9]/.test(src)) return null;
+    return { n: h.hadithnumber, text: txt.slice(0, m.index).trim(), src: src };
+  }
+  function pickHadith(list) {
+    var h = list[dayIndex(new Date()) % list.length];
+    wisdom.hadith = { text: h.text, src: 'الأربعون النووية · الحديث ' + h.n + ' · ' + h.src };
+  }
+  function loadHadith() {
+    var list = load('nawawi2', 7 * 24 * HOUR);
+    if (list && list.length) { pickHadith(list); return; }
+    getJSON('https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/ara-nawawi.min.json').then(function (j) {
+      var clean = j.hadiths.filter(function (h) { return h.text && h.text.length <= 420; }).map(parseHadith).filter(Boolean);
+      if (!clean.length) return;
+      store('nawawi2', clean); pickHadith(clean);
+    }).catch(function () {});
+  }
+  function rotateWisdom() {
+    var nextKind = showing === 'verse' ? 'hadith' : 'verse';
+    if (!wisdom[nextKind]) nextKind = showing;
+    var w = wisdom[nextKind], box = $('wisdom');
+    if (!w) { box.style.opacity = 0; return; }
+    box.style.opacity = 0;
+    setTimeout(function () {
+      $('wLbl').textContent = nextKind === 'verse' ? 'آية اليوم' : 'حديث اليوم';
+      $('wText').textContent = nextKind === 'verse' ? '﴿ ' + w.text + ' ﴾' : w.text;
+      $('wText').className = w.text.length > 220 ? 'small' : '';
+      $('wSrc').textContent = w.src;
+      box.style.opacity = 1; showing = nextKind;
+    }, 900);
+  }
+
+  // ---------- Matches (TheSportsDB free key, refreshed every 3 h, cached) ----------
+  var AR = { 'Saudi Arabia': 'السعودية', 'Al-Hilal': 'الهلال', 'Al-Nassr': 'النصر', 'Al-Ittihad': 'الاتحاد', 'Al-Ahli': 'الأهلي',
+    'Al-Shabab': 'الشباب', 'Al-Taawoun': 'التعاون', 'Al-Ettifaq': 'الاتفاق', 'Al-Fateh': 'الفتح', 'Al-Riyadh': 'الرياض', 'Damac': 'ضمك',
+    'Al-Khaleej': 'الخليج', 'Al-Fayha': 'الفيحاء', 'Al-Okhdood': 'الأخدود', 'Al-Qadsiah': 'القادسية', 'Al-Kholood': 'الخلود', 'Neom': 'نيوم',
+    'Al-Najma': 'النجمة', 'Al-Hazem': 'الحزم', 'Al-Wehda': 'الوحدة', 'Al-Raed': 'الرائد', 'Al-Faisaly': 'الفيصلي', 'Abha': 'أبها',
+    'Uruguay': 'الأوروغواي', 'Spain': 'إسبانيا', 'Argentina': 'الأرجنتين', 'Brazil': 'البرازيل', 'Japan': 'اليابان', 'Australia': 'أستراليا',
+    'Iraq': 'العراق', 'Jordan': 'الأردن', 'Qatar': 'قطر', 'United Arab Emirates': 'الإمارات', 'Kuwait': 'الكويت', 'Bahrain': 'البحرين',
+    'Oman': 'عُمان', 'Yemen': 'اليمن', 'Egypt': 'مصر', 'Morocco': 'المغرب', 'Algeria': 'الجزائر', 'Tunisia': 'تونس', 'Iran': 'إيران',
+    'South Korea': 'كوريا الجنوبية', 'China': 'الصين', 'Indonesia': 'إندونيسيا', 'Palestine': 'فلسطين', 'Syria': 'سوريا', 'Lebanon': 'لبنان',
+    'Mexico': 'المكسيك', 'USA': 'أمريكا', 'France': 'فرنسا', 'Germany': 'ألمانيا', 'England': 'إنجلترا', 'Portugal': 'البرتغال' };
+  function ar(n) { return AR[n] || n; }
+  function evDate(e) { return e.strTimestamp ? new Date(e.strTimestamp.replace(/\+.*$/, '') + 'Z') : new Date(e.dateEvent + 'T' + (e.strTime || '00:00:00') + 'Z'); }
+  function renderMatches(m) {
+    var card = $('matchCard');
+    var recentLast = m && m.last && m.last.intHomeScore !== null && m.last.intHomeScore !== undefined && (Date.now() - evDate(m.last)) < 4 * 864e5;
+    if (!m || (!m.next && !recentLast)) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    if (m.next) {
+      var d = evDate(m.next), h = d.getHours(), ap = h < 12 ? 'ص' : 'م'; h = h % 12; if (h === 0) h = 12;
+      var days = Math.round((new Date(d.toDateString()) - new Date(new Date().toDateString())) / 864e5);
+      var when = days === 0 ? 'اليوم' : days === 1 ? 'غدًا' : DAYS[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth() + 1);
+      $('matchLbl').textContent = 'المباراة القادمة' + (m.next.strLeague ? ' · ' + (m.next.strLeague === 'Saudi-Arabian Pro League' ? 'دوري روشن' : m.next.strLeague) : '');
+      $('matchTeams').innerHTML = ar(m.next.strHomeTeam) + '<span class="vs">×</span>' + ar(m.next.strAwayTeam);
+      $('matchWhen').innerHTML = when + ' · <span class="num">' + h + ':' + pad(d.getMinutes()) + '</span> ' + ap;
+    }
+    if (!m.next) { $('matchLbl').textContent = 'آخر مباراة'; $('matchTeams').innerHTML = ''; $('matchWhen').innerHTML = ''; }
+    if (recentLast) {
+      $('matchLast').innerHTML = 'آخر نتيجة: ' + ar(m.last.strHomeTeam) + ' <span class="num">' + m.last.intHomeScore + ' - ' + m.last.intAwayScore + '</span> ' + ar(m.last.strAwayTeam);
+    } else { $('matchLast').innerHTML = ''; }
+  }
+  function matches() {
+    var cached = load('matches', 3 * HOUR);
+    if (cached) { renderMatches(cached); return; }
+    renderMatches(load('matches'));
+    var res = { next: null, last: null }, i = 0;
+    function step() {
+      if (i >= CFG.teams.length) { store('matches', res); renderMatches(res); return; }
+      var id = CFG.teams[i++], base = 'https://www.thesportsdb.com/api/v1/json/123/';
+      getJSON(base + 'eventsnext.php?id=' + id).then(function (j) {
+        var ev = (j.events || []).filter(function (e) { return evDate(e) > Date.now() - 2 * HOUR; })[0];
+        if (ev && (!res.next || evDate(ev) < evDate(res.next))) res.next = ev;
+        return new Promise(function (r) { setTimeout(r, 1500); });   // stay well under the free rate limit
+      }).then(function () { return getJSON(base + 'eventslast.php?id=' + id); }).then(function (j) {
+        var ev = (j.results || j.events || [])[0];
+        if (ev && (!res.last || evDate(ev) > evDate(res.last))) res.last = ev;
+      }).catch(function () {}).then(function () { setTimeout(step, 1500); });
+    }
+    step();
+  }
+
+  // ---------- Start ----------
+  tick(); setInterval(tick, 1000);
+  showPhoto(); setInterval(showPhoto, 5 * 6e4);          // checks every 5 min; changes on each 30-min slot
+  weather(); setInterval(weather, 30 * 6e4);
+  loadVerse(); loadHadith(); setInterval(function () { loadVerse(); loadHadith(); }, HOUR);
+  setTimeout(rotateWisdom, 2500); setInterval(rotateWisdom, 60000);
+  matches(); setInterval(matches, 30 * 6e4);
 })();
 </script>
 </body>
