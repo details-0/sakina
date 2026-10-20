@@ -293,24 +293,37 @@
     if (now.getHours() === 3 && now.getMinutes() === 30 && now.getSeconds() === 0) location.reload();
   }
 
-  // ---------- Background photos (Unsplash, hotlinked; rotate every 30 min) ----------
-  var PHOTOS = [["photo-1682685797365-41f45b562c0a","NEOM"],["photo-1682687220566-5599dbbebf11","NEOM"],["photo-1682687218608-5e2522b04673","NEOM"],["photo-1682685796063-d2604827f7b3","NEOM"],["photo-1682687220208-22d7a2543e88","NEOM"],["photo-1682687220499-d9c06b872eee","NEOM"],["photo-1682687221175-fd40bbafe6ca","NEOM"],["photo-1682685797736-dabb341dc7de","NEOM"],["photo-1506795213373-430e921fe2ed","Hala AlGhanim"],["photo-1682687981974-c5ef2111640c","NEOM"],["photo-1682687218147-9806132dc697","NEOM"],["photo-1682686581362-796145f0e123","NEOM"],["photo-1682686581427-7c80ab60e3f3","NEOM"],["photo-1682685796766-0fddd3e480de","NEOM"],["photo-1682686580186-b55d2a91053c","NEOM"],["photo-1682687220067-dced9a881b56","NEOM"],["photo-1682687221073-53ad74c2cad7","NEOM"],["photo-1707343843598-39755549ac9a","NEOM"]];
+  // ---------- Background photos (rotate every 30 min) ----------
+  // This TV rejects images.unsplash.com's certificate chain, so the photos are hosted next to this page
+  // (N.jpg beside index.html, 1920x1080). Unsplash through the wsrv.nl image proxy, then Unsplash itself, are fallbacks.
+  var PHOTOS = [['1', 'photo-1682685797365-41f45b562c0a'], ['2', 'photo-1682687220566-5599dbbebf11'], ['3', 'photo-1682687218608-5e2522b04673'],
+            ['4', 'photo-1682685796063-d2604827f7b3'], ['5', 'photo-1682687220499-d9c06b872eee'], ['6', 'photo-1682685796766-0fddd3e480de'],
+            ['7', 'photo-1682687221073-53ad74c2cad7'], ['8', 'photo-1682687981974-c5ef2111640c']];
   var front = 'bgA';
-  function photoUrl(p) { return 'https://images.unsplash.com/' + p[0] + '?ixlib=rb-4.1.0&w=1920&h=1080&fit=crop&q=72&fm=jpg'; }
+  function photoUrls(p) {
+    var u = 'images.unsplash.com/' + p[1] + '?ixlib=rb-4.1.0&w=1920&h=1080&fit=crop&q=68&fm=jpg';
+    return [p[0] + '.jpg', 'photos/' + p[0] + '.jpg', 'https://wsrv.nl/?url=' + encodeURIComponent(u), 'https://' + u];
+  }
   function showPhoto() {
-    var slot = Math.floor(Date.now() / (30 * 6e4));
-    var p = PHOTOS[slot % PHOTOS.length], url = photoUrl(p), img = new Image();
-    img.onload = function () {
-      var back = front === 'bgA' ? 'bgB' : 'bgA';
-      $(back).style.backgroundImage = 'url("' + url + '")';
-      $(back).className = 'bg on'; $(front).className = 'bg';
-      setTimeout(function () { $(front).style.backgroundImage = ''; front = back; }, 3000); // release the old image
-      $('credit').textContent = 'Photo: ' + p[1] + ' · Unsplash';
-      dbg('OK   photo ' + p[0] + ' ' + img.naturalWidth + 'x' + img.naturalHeight);
-    };
-    img.onerror = function () { dbg('FAIL photo ' + p[0] + ' (image did not load)'); };
-    dbg('...  loading photo ' + p[0]);
-    img.src = url;
+    var slot = Math.floor(Date.now() / (30 * 6e4)), p = PHOTOS[slot % PHOTOS.length], urls = photoUrls(p), k = 0;
+    if ($(front).getAttribute('data-photo') === p[0]) return;   // this slot's photo is already up
+    function attempt() {
+      if (k >= urls.length) { dbg('FAIL photo ' + p[0] + ': no source worked'); return; }
+      var url = urls[k++], src = url.indexOf('//') > -1 ? url.split('/')[2] : 'this site', img = new Image();
+      img.onload = function () {
+        var back = front === 'bgA' ? 'bgB' : 'bgA', old = front;
+        $(back).style.backgroundImage = 'url("' + url + '")';
+        $(back).setAttribute('data-photo', p[0]);
+        $(back).className = 'bg on'; $(old).className = 'bg';
+        front = back;
+        setTimeout(function () { $(old).style.backgroundImage = ''; $(old).removeAttribute('data-photo'); }, 3000); // release the old image
+        $('credit').textContent = 'Photo: NEOM · Unsplash';
+        dbg('OK   photo ' + p[0] + ' from ' + src + ' ' + img.naturalWidth + 'x' + img.naturalHeight);
+      };
+      img.onerror = function () { dbg('FAIL photo ' + p[0] + ' from ' + src); attempt(); };
+      img.src = url;
+    }
+    attempt();
   }
 
   // ---------- Weather (Open-Meteo, every 30 min) ----------
